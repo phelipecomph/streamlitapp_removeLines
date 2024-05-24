@@ -4,6 +4,8 @@ import math
 import numpy as np
 import json
 from PIL import Image, ImageDraw
+from io import BytesIO
+
 
 # Função para desenhar linhas na imagem
 def draw_lines(image, lines, color, thickness):
@@ -21,6 +23,12 @@ def draw_single_line(image, line, color, thickness):
     x1, y1, x2, y2 = line
     draw.line((x1, y1, x2, y2), fill=color, width=thickness)
     return img
+
+def pil_to_bytes(img):
+    buf = BytesIO()
+    img.save(buf,format='PNG')
+    byte_im = buf.getvalue()
+    return byte_im
 
 def filter_horizontal_lines(lines, threshold=1.0):
     """
@@ -53,9 +61,12 @@ if uploaded_file is not None:
     bordas = cv2.Canny(imagem_binaria, 50, 150, apertureSize=3)
     image = imagem_binaria.copy()
     
-    # Carregar linhas
-    if 'lines' not in st.session_state:
-        st.session_state['lines'] = [list(line[0]) for line in cv2.HoughLinesP(bordas, 1, np.pi / 180, 100, minLineLength=100, maxLineGap=10)]
+    # Verificar se uma nova imagem foi carregada
+    if 'current_image' not in st.session_state or st.session_state['current_image'] != uploaded_file.name:
+                st.session_state['current_image'] = uploaded_file.name
+                all_lines = [list(line[0]) for line in cv2.HoughLinesP(bordas, 1, np.pi / 180, 100, minLineLength=100, maxLineGap=10)]
+                st.session_state['lines'] = filter_horizontal_lines(all_lines)
+                st.session_state['selected_line_idx'] = 0
     lines = st.session_state['lines']
     lines = filter_horizontal_lines(lines)
 
@@ -99,8 +110,10 @@ if uploaded_file is not None:
     
     st.image(img, caption='Imagem com linha(s)', use_column_width=True)
 
+    byte_img = pil_to_bytes(img)
+
     # Botão para remover a linha atual
-    if st.sidebar.button('Remover linha'):
+    if st.sidebar.button('Remover Linha'):
         lines.pop(selected_line_idx)
         st.session_state['lines'] = lines
         if selected_line_idx >= len(lines):
@@ -109,16 +122,17 @@ if uploaded_file is not None:
         st.experimental_rerun()
 
     # Botão para adicionar uma nova linha
-    if st.sidebar.button('Adicionar linha'):
+    if st.sidebar.button('Adicionar Linha'):
         lines.append([0, 0, 0, 0])
         st.session_state['lines'] = lines
         st.session_state['selected_line_idx'] = len(lines) - 1
         st.experimental_rerun()
 
     # Botão para salvar a imagem final e as linhas em JSON
-    if st.sidebar.button('Salvar linhas e imagem'):
-        final_img = draw_lines(image, lines, line_color, line_thickness)
-        final_img.save('imagem_final.png')
-        with open('linhas_final.json', 'w') as f:
-            f.write(str(lines))
-        st.sidebar.write("Imagem e linhas salvas!")
+    st.sidebar.download_button(
+            label="Download da Imagem",
+            data=byte_img,
+            file_name='image_without_lines.png',
+            mime='image/png'
+        )
+
