@@ -120,5 +120,5 @@ if uploaded_file is not None:
         final_img = draw_lines(image, lines, line_color, line_thickness)
         final_img.save('imagem_final.png')
         with open('linhas_final.json', 'w') as f:
-            json.dump(lines, f)
+            f.write(str(lines))
         st.sidebar.write("Imagem e linhas salvas!")
