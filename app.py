@@ -3,7 +3,7 @@ import cv2
 import math
 import numpy as np
 import json
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ExifTags
 from io import BytesIO
 
 
@@ -30,6 +30,24 @@ def pil_to_bytes(img):
     byte_im = buf.getvalue()
     return byte_im
 
+# Função para corrigir a orientação da imagem usando os metadados EXIF
+def correct_image_orientation(image):
+    try:         
+        for orientation in ExifTags.TAGS.keys():
+            if ExifTags.TAGS[orientation] == 'Orientation':
+                break
+            exif = dict(image._getexif().items())
+            if exif[orientation] == 3:
+                image = image.rotate(180, expand=True)
+            elif exif[orientation] == 6:
+                image = image.rotate(270, expand=True)         
+            elif exif[orientation] == 8:             
+                image = image.rotate(90, expand=True)     
+    except (AttributeError, KeyError, IndexError):         
+        # Caso a imagem não tenha metadados EXIF ou eles não estejam disponíveis
+        pass
+    return image
+
 def filter_horizontal_lines(lines, threshold=1.0):
     """
     Filtra as linhas mais horizontais do que verticais.
@@ -52,7 +70,9 @@ def filter_horizontal_lines(lines, threshold=1.0):
 # Carregar a imagem
 uploaded_file = st.file_uploader("Escolha uma imagem...", type=["jpg", "jpeg", "png"])
 if uploaded_file is not None:
-    image = np.array(Image.open(uploaded_file))
+    image = Image.open(uploaded_file)
+    image = correct_image_orientation(image)
+    image = np.array(image)
     imagem_cinza = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # Aplicar limiarização de Otsu
     _, imagem_binaria = cv2.threshold(imagem_cinza, 0.99, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
